@@ -599,27 +599,40 @@
     };
 
     Model.prototype.bind = function(events, callback) {
-      var binder, unbinder,
+      var binder, singleEvent, _fn, _i, _len, _ref,
         _this = this;
       this.constructor.bind(events, binder = function(record) {
         if (record && _this.eql(record)) {
           return callback.apply(_this, arguments);
         }
       });
-      this.constructor.bind('unbind', unbinder = function(record) {
-        if (record && _this.eql(record)) {
-          _this.constructor.unbind(events, binder);
-          return _this.constructor.unbind('unbind', unbinder);
-        }
-      });
-      return binder;
+      _ref = events.split(' ');
+      _fn = function(singleEvent) {
+        var unbinder;
+        return _this.constructor.bind("unbind", unbinder = function(record, event, cb) {
+          if (record && _this.eql(record)) {
+            if (event && event !== singleEvent) {
+              return;
+            }
+            if (cb && cb !== callback) {
+              return;
+            }
+            _this.constructor.unbind(event, binder);
+            return _this.constructor.unbind("unbind", unbinder);
+          }
+        });
+      };
+      for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+        singleEvent = _ref[_i];
+        _fn(singleEvent);
+      }
+      return this;
     };
 
     Model.prototype.one = function(events, callback) {
-      var binder,
-        _this = this;
-      return binder = this.bind(events, function() {
-        _this.constructor.unbind(events, binder);
+      var _this = this;
+      return this.bind(events, function() {
+        _this.unbind(events, arguments.callee);
         return callback.apply(_this, arguments);
       });
     };
@@ -631,8 +644,19 @@
       return (_ref = this.constructor).trigger.apply(_ref, args);
     };
 
-    Model.prototype.unbind = function() {
-      return this.trigger('unbind');
+    Model.prototype.unbind = function(events, callback) {
+      var event, _i, _len, _ref, _results;
+      if (events) {
+        _ref = events.split(' ');
+        _results = [];
+        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+          event = _ref[_i];
+          _results.push(this.trigger('unbind', event, callback));
+        }
+        return _results;
+      } else {
+        return this.trigger('unbind');
+      }
     };
 
     return Model;
